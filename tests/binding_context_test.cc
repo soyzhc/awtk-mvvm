@@ -1,148 +1,278 @@
-﻿#include "mvvm/awtk/binding_context_awtk.h"
+﻿#include "mvvm/base/model_factory.h"
+#include "mvvm/base/model_dummy.h"
+#include "mvvm/base/model_array.h"
+#include "mvvm/awtk/binding_context_awtk.h"
 #include "widgets/window.h"
 #include "widgets/slider.h"
+#include "widgets/button.h"
+#include "widgets/label.h"
+#include "ext_widgets/scroll_view/list_view.h"
+#include "ext_widgets/scroll_view/list_item.h"
 #include "base/idle.h"
 #include "gtest/gtest.h"
 #include "test_obj.inc"
-#include <string>
 
-using std::string;
+static model_t* s_temp_model;
+static model_t* s_humidity_model;
+static model_t* s_persons_model;
+
+#define STR_V_MODEL_TEMP "temp"
+#define STR_V_MODEL_PERSONS "persons"
+#define STR_V_MODEL_HUMIDITY "humidity"
+
+static model_t* test_temp_model_get(navigator_request_t* req) {
+  object_ref(OBJECT(s_temp_model));
+
+  return s_temp_model;
+}
+
+static model_t* test_humidity_model_get(navigator_request_t* req) {
+  object_ref(OBJECT(s_humidity_model));
+
+  return s_humidity_model;
+}
+
+static model_t* test_persons_model_get(navigator_request_t* req) {
+  object_ref(OBJECT(s_persons_model));
+
+  return s_persons_model;
+}
+
+static ret_t persons_gen(model_t* model, uint32_t n) {
+  uint32_t i = 0;
+  model_array_clear(model);
+
+  for (i = 0; i < n; i++) {
+    model_t* submodel = model_dummy_create(NULL);
+    object_set_prop_int(OBJECT(submodel), "a", i);
+    object_set_prop_int(OBJECT(submodel), "b", i + 1);
+    object_set_prop_int(OBJECT(submodel), "c", i + 2);
+    model_array_add(model, submodel);
+    object_unref(OBJECT(submodel));
+  }
+
+  return RET_OK;
+}
+
+static model_t* persons_create_model(void) {
+  model_t* model = model_array_create(NULL);
+
+  persons_gen(model, 10);
+
+  return model;
+}
+
+static void test_model_init(void) {
+  s_temp_model = test_obj_create_model();
+  model_factory_register(STR_V_MODEL_TEMP, test_temp_model_get);
+
+  s_humidity_model = test_obj_create_model();
+  model_factory_register(STR_V_MODEL_HUMIDITY, test_humidity_model_get);
+
+  s_persons_model = persons_create_model();
+  model_factory_register(STR_V_MODEL_PERSONS, test_persons_model_get);
+
+  return;
+}
+
+static ret_t test_model_deinit(void) {
+  model_factory_unregister(STR_V_MODEL_TEMP);
+  model_factory_unregister(STR_V_MODEL_HUMIDITY);
+  model_factory_unregister(STR_V_MODEL_PERSONS);
+
+  object_unref(OBJECT(s_temp_model));
+  s_temp_model = NULL;
+
+  object_unref(OBJECT(s_humidity_model));
+  s_humidity_model = NULL;
+
+  object_unref(OBJECT(s_persons_model));
+  s_persons_model = NULL;
+
+  return RET_OK;
+}
+
+static ret_t bind_for_window(widget_t* win) {
+  navigator_request_t* req = navigator_request_create("test", NULL);
+
+  binding_context_bind_for_window(win, req);
+  object_unref(OBJECT(req));
+
+  return RET_OK;
+}
 
 TEST(BindingContextAwtk, data_two_way) {
   value_t v;
   widget_t* win = window_create(NULL, 0, 0, 400, 300);
   widget_t* slider = slider_create(win, 0, 0, 128, 30);
-  view_model_t* vm = test_obj_create_view_model();
+  test_model_init();
 
+  widget_set_prop_str(win, WIDGET_PROP_V_MODEL, STR_V_MODEL_TEMP);
   widget_set_prop_str(slider, "v-data:value", "{i32}");
-  binding_context_bind_view_model(vm, win);
+  bind_for_window(win);
 
   widget_set_value(slider, 99);
-  ASSERT_EQ(view_model_get_prop(vm, "i32", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "i32", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 99);
 
   value_set_int(&v, 66);
-  view_model_set_prop(vm, "i32", &v);
+  object_set_prop(OBJECT(s_temp_model), "i32", &v);
   idle_dispatch();
   ASSERT_EQ(widget_get_value(slider), value_int(&v));
 
   widget_destroy(win);
+  test_model_deinit();
+}
+
+TEST(BindingContextAwtk, multi_model) {
+  widget_t* win = window_create(NULL, 0, 0, 400, 300);
+  widget_t* temp_slider = slider_create(win, 0, 0, 128, 30);
+  widget_t* humidity_slider = slider_create(win, 0, 70, 128, 30);
+
+  test_model_init();
+
+  widget_set_prop_str(temp_slider, WIDGET_PROP_V_MODEL, STR_V_MODEL_TEMP);
+  widget_set_prop_str(temp_slider, "v-data:value", "{i32}");
+
+  widget_set_prop_str(humidity_slider, WIDGET_PROP_V_MODEL, STR_V_MODEL_HUMIDITY);
+  widget_set_prop_str(humidity_slider, "v-data:value", "{i32}");
+
+  bind_for_window(win);
+
+  widget_set_value(temp_slider, 99);
+  widget_set_value(humidity_slider, 66);
+
+  ASSERT_EQ(object_get_prop_int(OBJECT(s_temp_model), "i32", 0), 99);
+  ASSERT_EQ(object_get_prop_int(OBJECT(s_humidity_model), "i32", 0), 66);
+
+  widget_destroy(win);
+  test_model_deinit();
 }
 
 TEST(BindingContextAwtk, data_once) {
   value_t v;
   widget_t* win = window_create(NULL, 0, 0, 400, 300);
   widget_t* slider = slider_create(win, 0, 0, 128, 30);
-  view_model_t* vm = test_obj_create_view_model();
+  test_model_init();
 
+  widget_set_prop_str(win, WIDGET_PROP_V_MODEL, STR_V_MODEL_TEMP);
   value_set_int(&v, 66);
-  view_model_set_prop(vm, "i32", &v);
+  object_set_prop(OBJECT(s_temp_model), "i32", &v);
 
   widget_set_prop_str(slider, "v-data:value", "{i32, Mode=Once}");
-  binding_context_bind_view_model(vm, win);
+  bind_for_window(win);
 
   widget_set_value(slider, 99);
-  ASSERT_EQ(view_model_get_prop(vm, "i32", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "i32", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 66);
 
   widget_destroy(win);
+  test_model_deinit();
 }
 
 TEST(BindingContextAwtk, data_one_way) {
   value_t v;
   widget_t* win = window_create(NULL, 0, 0, 400, 300);
   widget_t* slider = slider_create(win, 0, 0, 128, 30);
-  view_model_t* vm = test_obj_create_view_model();
+  test_model_init();
 
+  widget_set_prop_str(win, WIDGET_PROP_V_MODEL, STR_V_MODEL_TEMP);
   value_set_int(&v, 66);
-  view_model_set_prop(vm, "i32", &v);
+  object_set_prop(OBJECT(s_temp_model), "i32", &v);
 
   widget_set_prop_str(slider, "v-data:value", "{i32, Mode=OneWay}");
-  binding_context_bind_view_model(vm, win);
+  bind_for_window(win);
   ASSERT_EQ(widget_get_value(slider), 66);
 
   widget_set_value(slider, 99);
-  ASSERT_EQ(view_model_get_prop(vm, "i32", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "i32", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 66);
 
   value_set_int(&v, 88);
-  view_model_set_prop(vm, "i32", &v);
+  object_set_prop(OBJECT(s_temp_model), "i32", &v);
   idle_dispatch();
   ASSERT_EQ(widget_get_value(slider), 88);
 
   widget_destroy(win);
+  test_model_deinit();
 }
 
 TEST(BindingContextAwtk, data_changed) {
   value_t v;
   widget_t* win = window_create(NULL, 0, 0, 400, 300);
   widget_t* slider = slider_create(win, 0, 0, 128, 30);
-  view_model_t* vm = test_obj_create_view_model();
+  test_model_init();
 
+  widget_set_prop_str(win, WIDGET_PROP_V_MODEL, STR_V_MODEL_TEMP);
   value_set_int(&v, 66);
-  view_model_set_prop(vm, "i32", &v);
+  object_set_prop(OBJECT(s_temp_model), "i32", &v);
 
   widget_set_prop_str(slider, "v-data:value", "{i32, Mode=TwoWay, Trigger=Changed}");
-  binding_context_bind_view_model(vm, win);
+  bind_for_window(win);
   ASSERT_EQ(widget_get_value(slider), 66);
 
   widget_set_value(slider, 99);
-  ASSERT_EQ(view_model_get_prop(vm, "i32", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "i32", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 99);
 
   slider_set_value_internal(slider, 33, EVT_VALUE_CHANGING, TRUE);
-  ASSERT_EQ(view_model_get_prop(vm, "i32", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "i32", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 99);
 
   widget_destroy(win);
+  test_model_deinit();
 }
 
 TEST(BindingContextAwtk, data_changing) {
   value_t v;
   widget_t* win = window_create(NULL, 0, 0, 400, 300);
   widget_t* slider = slider_create(win, 0, 0, 128, 30);
-  view_model_t* vm = test_obj_create_view_model();
+  test_model_init();
 
+  widget_set_prop_str(win, WIDGET_PROP_V_MODEL, STR_V_MODEL_TEMP);
   value_set_int(&v, 66);
-  view_model_set_prop(vm, "i32", &v);
+  object_set_prop(OBJECT(s_temp_model), "i32", &v);
 
   widget_set_prop_str(slider, "v-data:value", "{i32, Mode=TwoWay, Trigger=Changing}");
-  binding_context_bind_view_model(vm, win);
+  bind_for_window(win);
   ASSERT_EQ(widget_get_value(slider), 66);
 
   widget_set_value(slider, 99);
-  ASSERT_EQ(view_model_get_prop(vm, "i32", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "i32", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 99);
 
   slider_set_value_internal(slider, 33, EVT_VALUE_CHANGING, TRUE);
-  ASSERT_EQ(view_model_get_prop(vm, "i32", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "i32", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 33);
 
   widget_destroy(win);
+  test_model_deinit();
 }
 
 TEST(BindingContextAwtk, data_explicit) {
   value_t v;
   widget_t* win = window_create(NULL, 0, 0, 400, 300);
   widget_t* slider = slider_create(win, 0, 0, 128, 30);
-  view_model_t* vm = test_obj_create_view_model();
+  test_model_init();
 
+  widget_set_prop_str(win, WIDGET_PROP_V_MODEL, STR_V_MODEL_TEMP);
   value_set_int(&v, 66);
-  view_model_set_prop(vm, "i32", &v);
+  object_set_prop(OBJECT(s_temp_model), "i32", &v);
 
   widget_set_prop_str(slider, "v-data:value", "{i32, Mode=TwoWay, Trigger=Explicit}");
-  binding_context_bind_view_model(vm, win);
+  bind_for_window(win);
   ASSERT_EQ(widget_get_value(slider), 66);
 
   widget_set_value(slider, 99);
-  ASSERT_EQ(view_model_get_prop(vm, "i32", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "i32", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 66);
 
   slider_set_value_internal(slider, 33, EVT_VALUE_CHANGING, TRUE);
-  ASSERT_EQ(view_model_get_prop(vm, "i32", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "i32", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 66);
 
   widget_destroy(win);
+  test_model_deinit();
 }
 
 TEST(BindingContextAwtk, command_update_to_model) {
@@ -150,21 +280,22 @@ TEST(BindingContextAwtk, command_update_to_model) {
   pointer_event_t e;
   widget_t* win = window_create(NULL, 0, 0, 400, 300);
   widget_t* slider = slider_create(win, 0, 0, 128, 30);
-  view_model_t* vm = test_obj_create_view_model();
+  test_model_init();
 
+  widget_set_prop_str(win, WIDGET_PROP_V_MODEL, STR_V_MODEL_TEMP);
   value_set_int(&v, 66);
-  view_model_set_prop(vm, "i32", &v);
+  object_set_prop(OBJECT(s_temp_model), "i32", &v);
 
   widget_set_prop_str(slider, "v-data:value", "{i32, Mode=TwoWay, Trigger=Explicit}");
   widget_set_prop_str(slider, "v-on:pointer_down", "{save, Args=2, UpdateModel=True}");
-  binding_context_bind_view_model(vm, win);
+  bind_for_window(win);
   ASSERT_EQ(widget_get_value(slider), 66);
 
   widget_set_value(slider, 99);
-  ASSERT_EQ(view_model_get_prop(vm, "i32", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "i32", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 66);
 
-  ASSERT_EQ(view_model_get_prop(vm, "save_count", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "save_count", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 0);
 
   e.e = event_init(EVT_POINTER_DOWN, slider);
@@ -172,29 +303,106 @@ TEST(BindingContextAwtk, command_update_to_model) {
   e.y = 30;
   widget_dispatch(slider, &(e.e));
 
-  ASSERT_EQ(view_model_get_prop(vm, "i32", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "i32", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 99);
 
-  ASSERT_EQ(view_model_get_prop(vm, "save_count", &v), RET_OK);
+  ASSERT_EQ(object_get_prop(OBJECT(s_temp_model), "save_count", &v), RET_OK);
   ASSERT_EQ(value_int(&v), 2);
 
   widget_destroy(win);
+  test_model_deinit();
 }
 
 TEST(BindingContextAwtk, command_close_window) {
   pointer_event_t e;
   widget_t* win = window_create(NULL, 0, 0, 400, 300);
-  widget_t* slider = slider_create(win, 0, 0, 128, 30);
-  view_model_t* vm = test_obj_create_view_model();
+  widget_t* button = button_create(win, 0, 0, 128, 30);
+  test_model_init();
 
-  widget_set_prop_str(slider, "v-on:pointer_down", "{save, Args=2, CloseWindow=True}");
-  binding_context_bind_view_model(vm, win);
+  widget_set_prop_str(win, WIDGET_PROP_V_MODEL, STR_V_MODEL_TEMP);
+  widget_set_prop_str(button, "v-on:pointer_down", "{save, Args=2, CloseWindow=True}");
+  bind_for_window(win);
 
-  e.e = event_init(EVT_POINTER_DOWN, slider);
+  e.e = event_init(EVT_POINTER_DOWN, button);
   e.x = 30;
   e.y = 30;
-  widget_dispatch(slider, &(e.e));
+  widget_dispatch(button, &(e.e));
 
   ASSERT_EQ(win->parent, (widget_t*)NULL);
+  idle_dispatch();
+  test_model_deinit();
+}
+
+TEST(BindingContextAwtk, array) {
+  uint32_t i = 0;
+  widget_t* win = window_create(NULL, 0, 0, 400, 300);
+  widget_t* list_view = list_view_create(win, 0, 0, 128, 300);
+  widget_t* list_item = list_item_create(list_view, 0, 0, 128, 30);
+
+  widget_t* a = slider_create(list_item, 0, 0, 0, 0);
+  widget_t* b = slider_create(list_item, 0, 0, 0, 0);
+  widget_t* c = slider_create(list_item, 0, 0, 0, 0);
+  widget_t* d = slider_create(list_item, 0, 0, 0, 0);
+
+  widget_set_name(a, "a");
+  widget_set_name(b, "b");
+  widget_set_name(c, "c");
+  widget_set_name(d, "d");
+  slider_set_max(a, 50000);
+  slider_set_max(b, 50000);
+  slider_set_max(c, 50000);
+  slider_set_max(d, 50000);
+
+  widget_set_prop_str(a, "v-data:value", "{item.a}");
+  widget_set_prop_str(b, "v-data:value", "{item.b}");
+  widget_set_prop_str(c, "v-data:value", "{item.c}");
+  widget_set_prop_str(d, "v-data:value", "{item.a + item.b - item.c + 1}");
+
+  test_model_init();
+
+  widget_set_prop_str(list_view, WIDGET_PROP_V_MODEL, STR_V_MODEL_PERSONS);
+  bind_for_window(win);
+
+  ASSERT_EQ(model_array_size(s_persons_model), 10);
+  ASSERT_EQ(list_view->children->size, model_array_size(s_persons_model));
+
+  for (i = 0; i < model_array_size(s_persons_model); i++) {
+    list_item = widget_get_child(list_view, i);
+    log_debug("i=%d\n", i);
+    a = widget_child(list_item, "a");
+    b = widget_child(list_item, "b");
+    c = widget_child(list_item, "c");
+    d = widget_child(list_item, "d");
+
+    ASSERT_EQ(widget_get_value(a), i);
+    ASSERT_EQ(widget_get_value(b), i + 1);
+    ASSERT_EQ(widget_get_value(c), i + 2);
+    ASSERT_EQ(widget_get_value(d), i);
+  }
+
+  model_array_clear(s_persons_model);
+  ASSERT_EQ(model_array_size(s_persons_model), 0);
+  idle_dispatch();
+  ASSERT_EQ(list_view->children->size, model_array_size(s_persons_model));
+
+  persons_gen(s_persons_model, 10000);
+  idle_dispatch();
+  for (i = 0; i < model_array_size(s_persons_model); i++) {
+    list_item = widget_get_child(list_view, i);
+    log_debug("i=%d\n", i);
+    a = widget_child(list_item, "a");
+    b = widget_child(list_item, "b");
+    c = widget_child(list_item, "c");
+    d = widget_child(list_item, "d");
+
+    ASSERT_EQ(widget_get_value(a), i);
+    ASSERT_EQ(widget_get_value(b), i + 1);
+    ASSERT_EQ(widget_get_value(c), i + 2);
+    ASSERT_EQ(widget_get_value(d), i);
+  }
+
+  widget_destroy(win);
+  test_model_deinit();
+
   idle_dispatch();
 }

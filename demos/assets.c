@@ -8,9 +8,12 @@
 #include "assets/inc/styles/window1.data"
 #include "assets/inc/ui/js_temperature1.data"
 #include "assets/inc/ui/js_shape.data"
+#include "assets/inc/ui/js_temperature10.data"
 #include "assets/inc/ui/temperature1.data"
+#include "assets/inc/ui/js_room_settings.data"
 #include "assets/inc/ui/shape.data"
 #include "assets/inc/ui/temperature6.data"
+#include "assets/inc/ui/js_home.data"
 #include "assets/inc/ui/js_temperature7.data"
 #include "assets/inc/ui/humidity.data"
 #include "assets/inc/ui/js_humidity.data"
@@ -18,13 +21,18 @@
 #include "assets/inc/ui/temperature7.data"
 #include "assets/inc/ui/temperature4.data"
 #include "assets/inc/ui/js_temperature9.data"
+#include "assets/inc/ui/home.data"
 #include "assets/inc/ui/js_temperature5.data"
+#include "assets/inc/ui/temperature_humidity.data"
 #include "assets/inc/ui/js_temperature4.data"
 #include "assets/inc/ui/temperature9.data"
 #include "assets/inc/ui/temperature5.data"
+#include "assets/inc/ui/temperature10.data"
+#include "assets/inc/ui/room_settings.data"
 #include "assets/inc/ui/js_demo9_main.data"
 #include "assets/inc/ui/js_temperature3.data"
 #include "assets/inc/ui/temperature2.data"
+#include "assets/inc/ui/js_temperature_humidity.data"
 #include "assets/inc/ui/temperature3.data"
 #include "assets/inc/ui/js_temperature2.data"
 #include "assets/inc/ui/demo9_main.data"
@@ -96,9 +104,12 @@ ret_t assets_init(void) {
 #else
   assets_manager_add(rm, ui_js_temperature1);
   assets_manager_add(rm, ui_js_shape);
+  assets_manager_add(rm, ui_js_temperature10);
   assets_manager_add(rm, ui_temperature1);
+  assets_manager_add(rm, ui_js_room_settings);
   assets_manager_add(rm, ui_shape);
   assets_manager_add(rm, ui_temperature6);
+  assets_manager_add(rm, ui_js_home);
   assets_manager_add(rm, ui_js_temperature7);
   assets_manager_add(rm, ui_humidity);
   assets_manager_add(rm, ui_js_humidity);
@@ -106,13 +117,18 @@ ret_t assets_init(void) {
   assets_manager_add(rm, ui_temperature7);
   assets_manager_add(rm, ui_temperature4);
   assets_manager_add(rm, ui_js_temperature9);
+  assets_manager_add(rm, ui_home);
   assets_manager_add(rm, ui_js_temperature5);
+  assets_manager_add(rm, ui_temperature_humidity);
   assets_manager_add(rm, ui_js_temperature4);
   assets_manager_add(rm, ui_temperature9);
   assets_manager_add(rm, ui_temperature5);
+  assets_manager_add(rm, ui_temperature10);
+  assets_manager_add(rm, ui_room_settings);
   assets_manager_add(rm, ui_js_demo9_main);
   assets_manager_add(rm, ui_js_temperature3);
   assets_manager_add(rm, ui_temperature2);
+  assets_manager_add(rm, ui_js_temperature_humidity);
   assets_manager_add(rm, ui_temperature3);
   assets_manager_add(rm, ui_js_temperature2);
   assets_manager_add(rm, ui_demo9_main);

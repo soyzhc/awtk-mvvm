@@ -35,7 +35,7 @@ typedef ret_t (*model_on_mount_t)(model_t* model);
 typedef ret_t (*model_on_will_unmount_t)(model_t* model);
 typedef ret_t (*model_on_unmount_t)(model_t* model);
 
-typedef model_t* (*model_create_t)(void* args);
+typedef model_t* (*model_create_t)(navigator_request_t* req);
 
 typedef struct _model_vtable_t {
   model_on_will_mount_t on_will_mount;
@@ -57,17 +57,6 @@ struct _model_t {
   /*private*/
   const model_vtable_t* vt;
 };
-
-/**
- * @method model_dummy_create
- * 创建dummy模型对象。
- *
- * 对于一些简单的窗口，只需要简单的导航(打开或关闭窗口)，可以不用实现自己的模型，而使用dummy模型。
- * @param {void*} args 参数。
- *
- * @return {model_t*} 返回model对象。
- */
-model_t* model_dummy_create(void* args);
 
 /**
  * @method model_on_will_mount
@@ -111,6 +100,9 @@ ret_t model_on_will_unmount(model_t* model);
 ret_t model_on_unmount(model_t* model);
 
 #define MODEL(model) ((model_t*)(model))
+
+#define MODEL_PROP_CURSOR "_cursor_"
+#define MODEL_PROP_ITEMS "_items_"
 
 /**
  * @enum model_event_type_t

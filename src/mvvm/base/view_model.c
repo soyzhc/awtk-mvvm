@@ -23,6 +23,26 @@
 #include "tkc/expr_eval.h"
 #include "tkc/utils.h"
 
+const char* view_model_preprocess_expr(view_model_t* vm, const char* expr) {
+  return_value_if_fail(vm != NULL && expr != NULL, NULL);
+
+  if (vm->preprocess_expr != NULL) {
+    return vm->preprocess_expr(vm, expr);
+  } else {
+    return expr;
+  }
+}
+
+const char* view_model_preprocess_prop(view_model_t* vm, const char* prop) {
+  return_value_if_fail(vm != NULL && prop != NULL, NULL);
+
+  if (vm->preprocess_prop != NULL) {
+    return vm->preprocess_prop(vm, prop);
+  } else {
+    return prop;
+  }
+}
+
 static ret_t model_on_event(void* ctx, event_t* e) {
   view_model_t* vm = VIEW_MODEL(ctx);
 
@@ -37,6 +57,7 @@ view_model_t* view_model_init(view_model_t* vm, view_model_type_t type, model_t*
   vm->type = type;
   vm->model = model;
 
+  object_ref(OBJECT(model));
   emitter_on(EMITTER(vm->model), EVT_PROP_CHANGED, model_on_event, vm);
   emitter_on(EMITTER(vm->model), EVT_PROPS_CHANGED, model_on_event, vm);
 
@@ -45,48 +66,37 @@ view_model_t* view_model_init(view_model_t* vm, view_model_type_t type, model_t*
 
 bool_t view_model_has_prop(view_model_t* vm, const char* name) {
   return_value_if_fail(vm != NULL && name != NULL, FALSE);
+  name = view_model_preprocess_prop(vm, name);
 
-  return object_has_prop(OBJECT(vm), name) || object_has_prop(OBJECT(vm->model), name);
+  return object_has_prop(OBJECT(vm), name);
 }
 
 ret_t view_model_get_prop(view_model_t* vm, const char* name, value_t* value) {
   return_value_if_fail(vm != NULL && name != NULL && value != NULL, RET_BAD_PARAMS);
+  name = view_model_preprocess_prop(vm, name);
 
-  if (object_get_prop(OBJECT(vm), name, value) == RET_OK) {
-    return RET_OK;
-  }
-
-  return object_get_prop(OBJECT(vm->model), name, value);
+  return object_get_prop(OBJECT(vm), name, value);
 }
 
 ret_t view_model_set_prop(view_model_t* vm, const char* name, const value_t* value) {
   return_value_if_fail(vm != NULL && name != NULL && value != NULL, RET_BAD_PARAMS);
+  name = view_model_preprocess_prop(vm, name);
 
   if (!tk_is_valid_name(name)) {
     return RET_OK;
   }
 
-  if (object_has_prop(OBJECT(vm), name)) {
-    if (object_set_prop(OBJECT(vm), name, value) == RET_OK) {
-      return RET_OK;
-    }
-  }
-
-  return object_set_prop(OBJECT(vm->model), name, value);
+  return object_set_prop(OBJECT(vm), name, value);
 }
 
 bool_t view_model_can_exec(view_model_t* vm, const char* name, const char* args) {
-  return object_can_exec(OBJECT(vm), name, args) || object_can_exec(OBJECT(vm->model), name, args);
+  return object_can_exec(OBJECT(vm), name, args);
 }
 
 ret_t view_model_exec(view_model_t* vm, const char* name, const char* args) {
   return_value_if_fail(vm != NULL && name != NULL, RET_BAD_PARAMS);
 
-  if (object_exec(OBJECT(vm), name, args) == RET_OK) {
-    return RET_OK;
-  }
-
-  return object_exec(OBJECT(vm->model), name, args);
+  return object_exec(OBJECT(vm), name, args);
 }
 
 static EvalFunc vm_get_func(const char* name, void* user_data) {
@@ -119,6 +129,7 @@ ret_t view_model_eval(view_model_t* vm, const char* expr, value_t* v) {
   return_value_if_fail(expr != NULL && v != NULL, RET_BAD_PARAMS);
   return_value_if_fail(obj != NULL && obj->vt != NULL && obj->ref_count >= 0, RET_BAD_PARAMS);
 
+  expr = view_model_preprocess_expr(vm, expr);
   if (tk_is_valid_name(expr)) {
     return view_model_get_prop(vm, expr, v);
   } else {

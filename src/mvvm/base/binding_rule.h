@@ -24,6 +24,7 @@
 
 #include "tkc/object.h"
 #include "mvvm/base/types_def.h"
+#include "mvvm/base/view_model.h"
 
 BEGIN_C_DECLS
 
@@ -47,6 +48,18 @@ typedef struct _binding_rule_t {
    * 绑定的上下文。
    */
   binding_context_t* binding_context;
+  /**
+   * @property {view_model_t*} view_model
+   * @annotation ["readable"]
+   * 绑定的ViewModel。
+   */
+  view_model_t* view_model;
+  /**
+   * @property {uint32_t} cursor;
+   * @annotation ["readable"]
+   * 对于数组的ViewModel，保存cursor。
+   */
+  uint32_t cursor;
 } binding_rule_t;
 
 #define BINDING_RULE(rule) ((binding_rule_t*)(rule))

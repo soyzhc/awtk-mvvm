@@ -66,8 +66,6 @@ static ret_t data_binding_object_set_prop(object_t* obj, const char* name, const
 
     if (equal(value, STR_ONCE)) {
       mode = BINDING_ONCE;
-    } else if (equal(value, STR_ONCE)) {
-      mode = BINDING_ONCE;
     } else if (equal(value, STR_TWO_WAY)) {
       mode = BINDING_TWO_WAY;
     } else if (equal(value, STR_ONE_WAY)) {
@@ -249,13 +247,18 @@ static ret_t value_fix(const char* name, value_t* value) {
 
 ret_t data_binding_get_prop(data_binding_t* rule, value_t* v) {
   value_t raw;
-  binding_context_t* ctx = NULL;
+  view_model_t* view_model = NULL;
   return_value_if_fail(rule != NULL && v != NULL, RET_BAD_PARAMS);
 
-  ctx = BINDING_RULE(rule)->binding_context;
-  return_value_if_fail(ctx != NULL && ctx->vm != NULL, RET_BAD_PARAMS);
+  view_model = BINDING_RULE(rule)->view_model;
+  return_value_if_fail(view_model != NULL, RET_BAD_PARAMS);
 
-  return_value_if_fail(view_model_eval(ctx->vm, rule->path, &raw) == RET_OK, RET_FAIL);
+  if (object_is_collection(OBJECT(view_model))) {
+    uint32_t cursor = BINDING_RULE(rule)->cursor;
+    object_set_prop_int(OBJECT(view_model), MODEL_PROP_CURSOR, cursor);
+  }
+
+  return_value_if_fail(view_model_eval(view_model, rule->path, &raw) == RET_OK, RET_FAIL);
 
   return value_to_view(rule->converter, &raw, v);
 }
@@ -275,20 +278,25 @@ static ret_t vm_set_prop(view_model_t* vm, const char* converter, const char* pa
 }
 
 ret_t data_binding_set_prop(data_binding_t* rule, const value_t* raw) {
-  binding_context_t* ctx = NULL;
+  view_model_t* view_model = NULL;
   return_value_if_fail(rule != NULL && raw != NULL, RET_BAD_PARAMS);
 
-  ctx = BINDING_RULE(rule)->binding_context;
-  return_value_if_fail(ctx != NULL && ctx->vm != NULL, RET_BAD_PARAMS);
+  view_model = BINDING_RULE(rule)->view_model;
+  return_value_if_fail(view_model != NULL, RET_BAD_PARAMS);
 
-  str_clear(&(ctx->vm->last_error));
-  if (!value_is_valid(rule->validator, raw, &(ctx->vm->last_error))) {
+  str_clear(&(view_model->last_error));
+  if (object_is_collection(OBJECT(view_model))) {
+    uint32_t cursor = BINDING_RULE(rule)->cursor;
+    object_set_prop_int(OBJECT(view_model), MODEL_PROP_CURSOR, cursor);
+  }
+
+  if (!value_is_valid(rule->validator, raw, &(view_model->last_error))) {
     value_t fix_value;
     value_set_int(&fix_value, 0);
     value_deep_copy(&fix_value, raw);
 
     if (value_fix(rule->validator, &fix_value) == RET_OK) {
-      ret_t ret = vm_set_prop(ctx->vm, rule->converter, rule->path, &fix_value);
+      ret_t ret = vm_set_prop(view_model, rule->converter, rule->path, &fix_value);
       value_reset(&fix_value);
 
       return ret;
@@ -298,5 +306,5 @@ ret_t data_binding_set_prop(data_binding_t* rule, const value_t* raw) {
     return RET_BAD_PARAMS;
   }
 
-  return vm_set_prop(ctx->vm, rule->converter, rule->path, raw);
+  return vm_set_prop(view_model, rule->converter, rule->path, raw);
 }

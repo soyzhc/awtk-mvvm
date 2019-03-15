@@ -22,25 +22,24 @@
 #include "tkc/mem.h"
 #include "mvvm/base/binding_context.h"
 
-ret_t binding_context_init(binding_context_t* ctx) {
+ret_t binding_context_init(binding_context_t* ctx, navigator_request_t* req, view_model_t* vm) {
   return_value_if_fail(ctx != NULL, RET_BAD_PARAMS);
 
   darray_init(&(ctx->command_bindings), 10, (tk_destroy_t)object_unref,
               (tk_compare_t)object_compare);
   darray_init(&(ctx->data_bindings), 10, (tk_destroy_t)object_unref, (tk_compare_t)object_compare);
 
+  if (req != NULL) {
+    object_ref(OBJECT(req));
+    ctx->navigator_request = req;
+  }
+
+  if (vm != NULL) {
+    object_ref(OBJECT(vm));
+    ctx->view_model = vm;
+  }
+
   return RET_OK;
-}
-
-ret_t binding_context_bind(binding_context_t* ctx, view_model_t* vm, void* widget) {
-  return_value_if_fail(vm != NULL && widget != NULL, RET_BAD_PARAMS);
-  return_value_if_fail(ctx != NULL && ctx->vt != NULL && ctx->vt->bind != NULL, RET_BAD_PARAMS);
-  return_value_if_fail(ctx->bound == FALSE, RET_BAD_PARAMS);
-
-  ctx->vm = vm;
-  ctx->widget = widget;
-
-  return ctx->vt->bind(ctx, vm, widget);
 }
 
 ret_t binding_context_update_to_view(binding_context_t* ctx) {
@@ -78,12 +77,29 @@ ret_t binding_context_update_to_model(binding_context_t* ctx) {
 ret_t binding_context_destroy(binding_context_t* ctx) {
   return_value_if_fail(ctx != NULL && ctx->vt != NULL, RET_BAD_PARAMS);
 
-  darray_deinit(&(ctx->command_bindings));
   darray_deinit(&(ctx->data_bindings));
+  darray_deinit(&(ctx->command_bindings));
+
+  if (ctx->navigator_request != NULL) {
+    object_unref(OBJECT(ctx->navigator_request));
+  }
+
+  if (ctx->view_model != NULL) {
+    object_unref(OBJECT(ctx->view_model));
+  }
 
   if (ctx->vt->destroy != NULL) {
     ctx->vt->destroy(ctx);
   }
+
+  return RET_OK;
+}
+
+ret_t binding_context_clear_bindings(binding_context_t* ctx) {
+  return_value_if_fail(ctx != NULL && ctx->vt != NULL, RET_BAD_PARAMS);
+
+  darray_clear(&(ctx->data_bindings));
+  darray_clear(&(ctx->command_bindings));
 
   return RET_OK;
 }
