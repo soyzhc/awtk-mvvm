@@ -29,11 +29,13 @@
 #include "assets/inc/ui/temperature5.data"
 #include "assets/inc/ui/temperature10.data"
 #include "assets/inc/ui/room_settings.data"
+#include "assets/inc/ui/js_books.data"
 #include "assets/inc/ui/js_demo9_main.data"
 #include "assets/inc/ui/js_temperature3.data"
 #include "assets/inc/ui/temperature2.data"
 #include "assets/inc/ui/js_temperature_humidity.data"
 #include "assets/inc/ui/temperature3.data"
+#include "assets/inc/ui/books.data"
 #include "assets/inc/ui/js_temperature2.data"
 #include "assets/inc/ui/demo9_main.data"
 #ifdef WITH_STB_IMAGE
@@ -87,7 +89,6 @@
 #endif /*WITH_VGCANVAS*/
 #if defined(WITH_STB_FONT) || defined(WITH_FT_FONT)
 #ifdef WITH_MINI_FONT
-#include "assets/inc/fonts/default.mini.res"
 #else /*WITH_MINI_FONT*/
 #include "assets/inc/fonts/default.res"
 #endif /*WITH_MINI_FONT*/
@@ -125,11 +126,13 @@ ret_t assets_init(void) {
   assets_manager_add(rm, ui_temperature5);
   assets_manager_add(rm, ui_temperature10);
   assets_manager_add(rm, ui_room_settings);
+  assets_manager_add(rm, ui_js_books);
   assets_manager_add(rm, ui_js_demo9_main);
   assets_manager_add(rm, ui_js_temperature3);
   assets_manager_add(rm, ui_temperature2);
   assets_manager_add(rm, ui_js_temperature_humidity);
   assets_manager_add(rm, ui_temperature3);
+  assets_manager_add(rm, ui_books);
   assets_manager_add(rm, ui_js_temperature2);
   assets_manager_add(rm, ui_demo9_main);
   assets_manager_add(rm, strings_zh_CN);

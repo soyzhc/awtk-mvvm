@@ -221,10 +221,10 @@ jerry_value_t jsobj_get_global(const char* name) {
 }
 
 jerry_value_t jsobj_get_model(const char* name) {
-  jerry_value_t model = jsobj_get_global(name);
-  jerry_value_check(model);
+  jerry_value_t view_model = jsobj_get_global(name);
+  jerry_value_check(view_model);
 
-  return model;
+  return view_model;
 }
 
 jerry_value_t jsobj_get_prop_value(jerry_value_t obj, const char* name) {
@@ -301,7 +301,7 @@ ret_t jsobj_exec_ex(jerry_value_t obj, const char* name, jerry_value_t jsargs) {
     jerry_value_t func = jsobj_get_prop_value(obj, name);
     if (jerry_value_is_function(func)) {
       jerry_value_t jsret = jerry_call_function(func, obj, &jsargs, 1);
-      ret = (ret_t)jerry_value_to_number(jsret);
+      ret = (ret_t)jerry_get_number_value(jsret);
       jerry_release_value(func);
       jerry_release_value(jsret);
     } else {
@@ -329,7 +329,7 @@ bool_t jsobj_can_exec(jerry_value_t obj, const char* name, const char* args) {
     if (jerry_value_is_function(func)) {
       jerry_value_t jsargs = jerry_create_str(args);
       jerry_value_t jsret = jerry_call_function(func, obj, &jsargs, 1);
-      ret = jerry_value_to_boolean(jsret);
+      ret = jerry_get_boolean_value(jsret);
       jerry_release_value(func);
       jerry_release_value(jsret);
       jerry_release_value(jsargs);
@@ -525,7 +525,7 @@ ret_t jsvalue_converter_to_view(const char* name, const value_t* from, value_t* 
 }
 
 ret_t jsvalue_converter_to_model(const char* name, const value_t* from, value_t* to, str_t* temp) {
-  return value_convert(name, JSOBJ_VALUE_CONVERTER_TO_MODEL, from, to, temp);
+  return value_convert(name, JSOBJ_VALUE_CONVERTER_TO_VIEW_MODEL, from, to, temp);
 }
 
 static jerry_value_t jsobj_get_validator(const char* name) {

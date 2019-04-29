@@ -28,17 +28,34 @@
 #include "base/widget.h"
 #include "widgets/window.h"
 #include "mvvm/base/data_binding.h"
-#include "mvvm/base/model_dummy.h"
-#include "mvvm/base/model_factory.h"
+#include "mvvm/base/view_model_dummy.h"
+#include "mvvm/base/view_model_array.h"
+#include "mvvm/base/view_model_factory.h"
 #include "mvvm/base/binding_context.h"
 #include "mvvm/base/command_binding.h"
-#include "mvvm/base/view_model_array.h"
-#include "mvvm/base/view_model_normal.h"
 #include "mvvm/base/binding_rule_parser.h"
 #include "mvvm/awtk/binding_context_awtk.h"
 
-static model_t* default_create_model(widget_t* widget, navigator_request_t* req);
 static ret_t binding_context_bind_for_widget(widget_t* widget, navigator_request_t* req);
+
+static const char* widget_get_prop_vmodel(widget_t* widget) {
+  value_t v;
+  value_set_str(&v, NULL);
+
+  return (widget_get_prop(widget, WIDGET_PROP_V_MODEL, &v) == RET_OK) ? value_str(&v) : NULL;
+}
+
+static ret_t view_model_on_window_close(void* ctx, event_t* e) {
+  view_model_on_will_unmount(VIEW_MODEL(ctx));
+
+  return RET_OK;
+}
+
+static ret_t view_model_on_window_destroy(void* ctx, event_t* e) {
+  view_model_on_unmount(VIEW_MODEL(ctx));
+
+  return RET_OK;
+}
 
 static ret_t visit_data_binding_update_error_of(void* ctx, const void* data) {
   data_binding_t* rule = DATA_BINDING(data);
@@ -93,7 +110,7 @@ static ret_t on_widget_value_change(void* ctx, event_t* e) {
 static ret_t binding_context_bind_data(binding_context_t* ctx, const char* name,
                                        const char* value) {
   widget_t* widget = WIDGET(ctx->current_widget);
-  data_binding_t* rule = (data_binding_t*)binding_rule_parse(name, value);
+  data_binding_t* rule = (data_binding_t*)binding_rule_parse(name, value, widget->vt->inputable);
   return_value_if_fail(rule != NULL, RET_FAIL);
 
   BINDING_RULE(rule)->widget = widget;
@@ -101,14 +118,14 @@ static ret_t binding_context_bind_data(binding_context_t* ctx, const char* name,
   BINDING_RULE(rule)->view_model = ctx->view_model;
 
   if (object_is_collection(OBJECT(ctx->view_model))) {
-    uint32_t cursor = object_get_prop_int(OBJECT(ctx->view_model), MODEL_PROP_CURSOR, 0);
+    uint32_t cursor = object_get_prop_int(OBJECT(ctx->view_model), VIEW_MODEL_PROP_CURSOR, 0);
     BINDING_RULE(rule)->cursor = cursor;
   }
 
   goto_error_if_fail(darray_push(&(ctx->data_bindings), rule) == RET_OK);
 
   if (rule->trigger != UPDATE_WHEN_EXPLICIT) {
-    if (rule->mode == BINDING_TWO_WAY || rule->mode == BINDING_ONE_WAY_TO_MODEL) {
+    if (rule->mode == BINDING_TWO_WAY || rule->mode == BINDING_ONE_WAY_TO_VIEW_MODEL) {
       if (tk_str_eq(rule->prop, WIDGET_PROP_VALUE)) {
         if (rule->trigger == UPDATE_WHEN_CHANGING) {
           widget_on(widget, EVT_VALUE_CHANGING, on_widget_value_change, rule);
@@ -161,12 +178,18 @@ static ret_t binding_context_bind_command(binding_context_t* ctx, const char* na
                                           const char* value) {
   int32_t event = 0;
   widget_t* widget = WIDGET(ctx->current_widget);
-  command_binding_t* rule = (command_binding_t*)binding_rule_parse(name, value);
+  command_binding_t* rule = (command_binding_t*)binding_rule_parse(name, value, BINDING_ONCE);
   return_value_if_fail(rule != NULL, RET_FAIL);
 
   BINDING_RULE(rule)->widget = widget;
   BINDING_RULE(rule)->binding_context = ctx;
   BINDING_RULE(rule)->view_model = ctx->view_model;
+
+  if (object_is_collection(OBJECT(ctx->view_model))) {
+    uint32_t cursor = object_get_prop_int(OBJECT(ctx->view_model), VIEW_MODEL_PROP_CURSOR, 0);
+    BINDING_RULE(rule)->cursor = cursor;
+  }
+
   goto_error_if_fail(darray_push(&(ctx->command_bindings), rule) == RET_OK);
 
   event = int_str_name(s_event_map, rule->event, EVT_NONE);
@@ -203,23 +226,44 @@ static ret_t on_view_model_prop_change(void* ctx, event_t* e) {
 static view_model_t* binding_context_awtk_create_view_model(widget_t* widget,
                                                             navigator_request_t* req) {
   view_model_t* view_model = NULL;
-  model_t* model = default_create_model(widget, req);
+  widget_t* win = widget_get_window(widget);
+  const char* vmodel = widget_get_prop_vmodel(widget);
 
-  if (object_is_collection(OBJECT(model))) {
-    view_model = view_model_array_create(model);
-  } else {
-    view_model = view_model_normal_create(model);
+  if (vmodel != NULL) {
+    char name[TK_NAME_LEN + 1];
+    char* ext_name = NULL;
+    tk_strncpy(name, vmodel, TK_NAME_LEN);
+
+    if (req != NULL) {
+      object_set_prop_pointer(OBJECT(req), NAVIGATOR_ARG_VIEW, widget);
+    }
+
+    ext_name = strrchr(name, '.');
+    if (ext_name != NULL) {
+      *ext_name = '\0';
+      view_model = view_model_factory_create_model(name, req);
+      if (view_model == NULL) {
+        *ext_name = '.';
+        view_model = view_model_factory_create_model(ext_name, req);
+      }
+      return_value_if_fail(view_model != NULL, NULL);
+    } else {
+      view_model = view_model_factory_create_model(name, req);
+      return_value_if_fail(view_model != NULL, NULL);
+    }
   }
-  object_unref(OBJECT(model));
+
+  if (view_model == NULL) {
+    if (vmodel != NULL) {
+      log_warn("%s not found view_model %s\n", __FUNCTION__, vmodel);
+    }
+    view_model = view_model_dummy_create(req);
+  }
+
+  widget_on(win, EVT_DESTROY, view_model_on_window_destroy, view_model);
+  widget_on(win, EVT_WINDOW_CLOSE, view_model_on_window_close, view_model);
 
   return view_model;
-}
-
-static const char* widget_get_prop_vmodel(widget_t* widget) {
-  value_t v;
-  value_set_str(&v, NULL);
-
-  return (widget_get_prop(widget, WIDGET_PROP_V_MODEL, &v) == RET_OK) ? value_str(&v) : NULL;
 }
 
 static ret_t binding_context_awtk_bind_widget(binding_context_t* ctx, widget_t* widget) {
@@ -244,7 +288,7 @@ static ret_t binding_context_awtk_bind_widget(binding_context_t* ctx, widget_t* 
   WIDGET_FOR_EACH_CHILD_END();
 
   if (vmodel != NULL) {
-    model_on_mount(view_model->model);
+    view_model_on_mount(view_model);
     emitter_on(EMITTER(view_model), EVT_PROP_CHANGED, on_view_model_prop_change, ctx);
     emitter_on(EMITTER(view_model), EVT_PROPS_CHANGED, on_view_model_prop_change, ctx);
   }
@@ -252,15 +296,35 @@ static ret_t binding_context_awtk_bind_widget(binding_context_t* ctx, widget_t* 
   return RET_OK;
 }
 
-static ret_t binding_context_awtk_bind_widget_only(binding_context_t* ctx, widget_t* widget) {
-  if (widget->custom_props != NULL) {
-    ctx->current_widget = widget;
-    object_foreach_prop(widget->custom_props, visit_bind_one_prop, ctx);
+static ret_t widget_trim_children(widget_t* widget, uint32_t nr) {
+  int32_t i = 0;
+  int32_t real_nr = widget_count_children(widget);
+
+  widget->need_relayout_children = TRUE;
+  if (real_nr <= nr || widget->children == NULL) {
+    return RET_OK;
   }
 
-  WIDGET_FOR_EACH_CHILD_BEGIN(widget, iter, i)
-  binding_context_awtk_bind_widget_only(ctx, iter);
-  WIDGET_FOR_EACH_CHILD_END();
+  for (i = nr; i < real_nr; i++) {
+    widget_t* child = WIDGET(widget->children->elms[i]);
+
+    child->parent = NULL;
+    if (widget->target == child) {
+      widget->target = NULL;
+    }
+
+    if (widget->grab_widget == child) {
+      widget->grab_widget = NULL;
+    }
+
+    if (widget->key_target == child) {
+      widget->key_target = NULL;
+    }
+
+    widget_destroy(child);
+  }
+
+  widget->children->size = nr;
 
   return RET_OK;
 }
@@ -269,7 +333,7 @@ static ret_t binding_context_prepare_children(binding_context_t* ctx, widget_t* 
   uint32_t i = 0;
   view_model_t* view_model = ctx->view_model;
   widget_t* template_widget = WIDGET(ctx->template_widget);
-  uint32_t items = object_get_prop_int(OBJECT(view_model), MODEL_PROP_ITEMS, 0);
+  uint32_t items = object_get_prop_int(OBJECT(view_model), VIEW_MODEL_PROP_ITEMS, 0);
 
   if (ctx->template_widget == NULL) {
     template_widget = widget_get_child(widget, 0);
@@ -278,10 +342,9 @@ static ret_t binding_context_prepare_children(binding_context_t* ctx, widget_t* 
     widget_remove_child(widget, template_widget);
   }
 
-  widget_destroy_children(widget);
-  binding_context_clear_bindings(ctx);
+  widget_trim_children(widget, items);
 
-  for (i = 0; i < items; i++) {
+  for (i = widget_count_children(widget); i < items; i++) {
     widget_clone(template_widget, widget);
   }
   return_value_if_fail(items == widget_count_children(widget), RET_OOM);
@@ -289,19 +352,48 @@ static ret_t binding_context_prepare_children(binding_context_t* ctx, widget_t* 
   return RET_OK;
 }
 
-static ret_t binding_context_awtk_bind_widget_array(binding_context_t* ctx) {
-  widget_t* widget = ctx->widget;
+static bool_t widget_is_for_items(widget_t* widget) {
+  value_t v;
+
+  value_set_bool(&v, FALSE);
+  widget_get_prop(widget, WIDGET_PROP_V_FOR_ITEMS, &v);
+
+  return value_bool(&v);
+}
+
+static ret_t on_reset_emitter(void* ctx, const void* data) {
+  widget_t* widget = WIDGET(data);
+  if (widget->emitter != NULL) {
+    emitter_deinit(widget->emitter);
+  }
+
+  return RET_OK;
+}
+
+static ret_t binding_context_awtk_bind_widget_array(binding_context_t* ctx, widget_t* widget) {
   view_model_t* view_model = ctx->view_model;
 
   ctx->request_rebind = 0;
   return_value_if_fail(object_is_collection(OBJECT(view_model)), RET_BAD_PARAMS);
-  return_value_if_fail(binding_context_prepare_children(ctx, widget) == RET_OK, RET_FAIL);
 
-  view_model_array_set_cursor(view_model, 0);
-  WIDGET_FOR_EACH_CHILD_BEGIN(widget, iter, i)
-  binding_context_awtk_bind_widget_only(ctx, iter);
-  view_model_array_inc_cursor(view_model);
-  WIDGET_FOR_EACH_CHILD_END();
+  if (widget->custom_props != NULL) {
+    ctx->current_widget = widget;
+    object_foreach_prop(widget->custom_props, visit_bind_one_prop, ctx);
+  }
+
+  if (widget_is_for_items(widget)) {
+    return_value_if_fail(binding_context_prepare_children(ctx, widget) == RET_OK, RET_FAIL);
+
+    view_model_array_set_cursor(view_model, 0);
+    WIDGET_FOR_EACH_CHILD_BEGIN(widget, iter, i)
+    binding_context_awtk_bind_widget_array(ctx, iter);
+    view_model_array_inc_cursor(view_model);
+    WIDGET_FOR_EACH_CHILD_END();
+  } else {
+    WIDGET_FOR_EACH_CHILD_BEGIN(widget, iter, i)
+    binding_context_awtk_bind_widget_array(ctx, iter);
+    WIDGET_FOR_EACH_CHILD_END();
+  }
 
   return RET_OK;
 }
@@ -309,10 +401,12 @@ static ret_t binding_context_awtk_bind_widget_array(binding_context_t* ctx) {
 static ret_t binding_context_rebind_in_idle(const idle_info_t* info) {
   binding_context_t* ctx = BINDING_CONTEXT(info->ctx);
 
-  log_debug("start_rebing\n");
-  binding_context_awtk_bind_widget_array(ctx);
+  log_debug("start_rebind\n");
+  binding_context_clear_bindings(ctx);
+  widget_foreach(ctx->widget, on_reset_emitter, NULL);
+  binding_context_awtk_bind_widget_array(ctx, ctx->widget);
   binding_context_update_to_view(ctx);
-  log_debug("end_rebing\n");
+  log_debug("end_rebind\n");
 
   return RET_REMOVE;
 }
@@ -323,7 +417,9 @@ static ret_t binding_context_on_rebind(void* c, event_t* e) {
   if (ctx->request_rebind == 0) {
     idle_add(binding_context_rebind_in_idle, ctx);
   }
+
   ctx->request_rebind++;
+  ctx->request_update_view = 0;
 
   return RET_OK;
 }
@@ -332,7 +428,10 @@ static ret_t binding_context_awtk_bind(binding_context_t* ctx, void* widget) {
   ret_t ret = RET_OK;
 
   if (object_is_collection(OBJECT(ctx->view_model))) {
-    ret = binding_context_awtk_bind_widget_array(ctx);
+    ret = binding_context_awtk_bind_widget_array(ctx, WIDGET(widget));
+
+    emitter_on(EMITTER(ctx->view_model), EVT_PROP_CHANGED, on_view_model_prop_change, ctx);
+    emitter_on(EMITTER(ctx->view_model), EVT_PROPS_CHANGED, on_view_model_prop_change, ctx);
     emitter_on(EMITTER(ctx->view_model), EVT_ITEMS_CHANGED, binding_context_on_rebind, ctx);
   } else {
     ret = binding_context_awtk_bind_widget(ctx, WIDGET(widget));
@@ -375,10 +474,12 @@ static ret_t visit_command_binding(void* ctx, const void* data) {
 }
 
 static ret_t binding_context_awtk_update_to_view_sync(binding_context_t* ctx) {
-  darray_foreach(&(ctx->data_bindings), visit_data_binding_update_to_view, ctx);
-  darray_foreach(&(ctx->command_bindings), visit_command_binding, ctx);
+  if (ctx->request_update_view > 0) {
+    darray_foreach(&(ctx->data_bindings), visit_data_binding_update_to_view, ctx);
+    darray_foreach(&(ctx->command_bindings), visit_command_binding, ctx);
 
-  ctx->request_update_view = 0;
+    ctx->request_update_view = 0;
+  }
 
   return RET_OK;
 }
@@ -401,6 +502,7 @@ static ret_t binding_context_awtk_update_to_view(binding_context_t* ctx) {
     }
     ctx->request_update_view++;
   } else {
+    ctx->request_update_view++;
     binding_context_awtk_update_to_view_sync(ctx);
   }
 
@@ -413,7 +515,7 @@ static ret_t visit_data_binding_update_to_model(void* ctx, const void* data) {
   widget_t* widget = WIDGET(BINDING_RULE(rule)->widget);
 
   if (rule->trigger == UPDATE_WHEN_EXPLICIT) {
-    if (rule->mode == BINDING_TWO_WAY || rule->mode == BINDING_ONE_WAY_TO_MODEL) {
+    if (rule->mode == BINDING_TWO_WAY || rule->mode == BINDING_ONE_WAY_TO_VIEW_MODEL) {
       return_value_if_fail(widget_get_prop(widget, rule->prop, &v) == RET_OK, RET_OK);
       return_value_if_fail(data_binding_set_prop(rule, &v) == RET_OK, RET_OK);
     }
@@ -459,7 +561,7 @@ binding_context_t* binding_context_awtk_create(widget_t* widget, navigator_reque
       ctx->vt = &s_binding_context_vtable;
 
       if (binding_context_init(ctx, req, view_model) == RET_OK) {
-        model_on_will_mount(view_model->model, req);
+        view_model_on_will_mount(view_model, req);
       } else {
         binding_context_destroy(ctx);
         ctx = NULL;
@@ -502,60 +604,6 @@ error:
 
 ret_t binding_context_bind_for_window(widget_t* widget, navigator_request_t* req) {
   return binding_context_bind_for_widget(widget, req);
-}
-
-static ret_t model_on_window_close(void* ctx, event_t* e) {
-  model_on_will_unmount(MODEL(ctx));
-
-  return RET_OK;
-}
-
-static ret_t model_on_window_destroy(void* ctx, event_t* e) {
-  model_on_unmount(MODEL(ctx));
-
-  return RET_OK;
-}
-
-static model_t* default_create_model(widget_t* widget, navigator_request_t* req) {
-  model_t* model = NULL;
-  widget_t* win = widget_get_window(widget);
-  const char* vmodel = widget_get_prop_vmodel(widget);
-
-  if (vmodel != NULL) {
-    char name[TK_NAME_LEN + 1];
-    char* ext_name = NULL;
-    tk_strncpy(name, vmodel, TK_NAME_LEN);
-
-    if (req != NULL) {
-      object_set_prop_pointer(OBJECT(req), NAVIGATOR_ARG_VIEW, widget);
-    }
-
-    ext_name = strrchr(name, '.');
-    if (ext_name != NULL) {
-      *ext_name = '\0';
-      model = model_factory_create_model(name, req);
-      if (model == NULL) {
-        *ext_name = '.';
-        model = model_factory_create_model(ext_name, req);
-      }
-      return_value_if_fail(model != NULL, NULL);
-    } else {
-      model = model_factory_create_model(name, req);
-      return_value_if_fail(model != NULL, NULL);
-    }
-  }
-
-  if (model == NULL) {
-    if (vmodel != NULL) {
-      log_warn("%s not found model %s\n", __FUNCTION__, vmodel);
-    }
-    model = model_dummy_create(req);
-  }
-
-  widget_on(win, EVT_DESTROY, model_on_window_destroy, model);
-  widget_on(win, EVT_WINDOW_CLOSE, model_on_window_close, model);
-
-  return model;
 }
 
 ret_t awtk_open_window(navigator_request_t* req) {

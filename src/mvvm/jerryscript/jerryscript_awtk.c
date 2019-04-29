@@ -31,7 +31,7 @@
 #include "mvvm/jerryscript/jsobj.h"
 #include "mvvm/jerryscript/jerryscript_awtk.h"
 #include "mvvm/base/navigator.h"
-#include "mvvm/base/model_factory.h"
+#include "mvvm/base/view_model_factory.h"
 #include "mvvm/jerryscript/jsobj.h"
 #include "mvvm/jerryscript/jerryscript_awtk.h"
 #include "mvvm/jerryscript/mvvm_jerryscript.h"
@@ -53,6 +53,8 @@ static ret_t ret_t_init(void) {
   jsobj_set_prop_int(obj, "RET_STOP", RET_STOP);
   jsobj_set_prop_int(obj, "RET_CONTINUE", RET_CONTINUE);
   jsobj_set_prop_int(obj, "RET_BAD_PARAMS", RET_BAD_PARAMS);
+  jsobj_set_prop_int(obj, "RET_ITEMS_CHANGED", RET_ITEMS_CHANGED);
+  jsobj_set_prop_int(obj, "RET_OBJECT_CHANGED", RET_OBJECT_CHANGED);
 
   jerry_release_value(obj);
 
@@ -201,9 +203,9 @@ error:
   return jerry_create_number(ret);
 }
 
-static model_t* model_jerryscript_create_with_widget(navigator_request_t* req) {
+static view_model_t* view_model_jerryscript_create_with_widget(navigator_request_t* req) {
   char* p = NULL;
-  model_t* model = NULL;
+  view_model_t* view_model = NULL;
   const char* vmodel = NULL;
   char name[TK_NAME_LEN + 5];
   const asset_info_t* asset = NULL;
@@ -222,10 +224,10 @@ static model_t* model_jerryscript_create_with_widget(navigator_request_t* req) {
   asset = widget_load_asset(widget, ASSET_TYPE_SCRIPT, name);
   return_value_if_fail(asset != NULL, NULL);
 
-  model = model_jerryscript_create(name, (const char*)(asset->data), asset->size, req);
+  view_model = view_model_jerryscript_create(name, (const char*)(asset->data), asset->size, req);
   widget_unload_asset(widget, asset);
 
-  return model;
+  return view_model;
 }
 
 ret_t jerryscript_awtk_init(void) {
@@ -238,7 +240,7 @@ ret_t jerryscript_awtk_init(void) {
   jerryx_handler_register_global((const jerry_char_t*)"idleAdd", wrap_idle_add);
   jerryx_handler_register_global((const jerry_char_t*)"idleRemove", wrap_idle_remove);
   jerryx_handler_register_global((const jerry_char_t*)"navigateTo", wrap_navigate_to);
-  model_factory_register(".js", model_jerryscript_create_with_widget);
+  view_model_factory_register(".js", view_model_jerryscript_create_with_widget);
 
   return RET_OK;
 }
