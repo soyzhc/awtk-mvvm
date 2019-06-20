@@ -1,18 +1,17 @@
 // Model
 function Temperature (req) {
-  this.temp = req.temp || 20;
-  this.saved_temp = 20;
+  this.value = req.value || 20;
+  this.applydValue = 20;
 }
 
-Temperature.prototype.save = function(args) {
-  this.saved_temp = this.temp;
+Temperature.prototype.apply = function(args) {
+  this.applydValue = this.value;
 
-  this.notifyPropsChanged();
-  return true;
+  return RET_OBJECT_CHANGED;
 }
 
-Temperature.prototype.canSave = function(args) {
-  return this.saved_temp != this.temp;
+Temperature.prototype.canApply = function(args) {
+  return this.applydValue != this.value;
 }
 
 // Model creator
@@ -20,7 +19,8 @@ function createTemperatureEx(req) {
   return new Temperature(req);
 }
 
-// ValueValidators
+// ValueConverters
+var ValueConverters = ValueConverters || {};
 ValueConverters.fahrenheit = {
   toView: function(v) {
     return v * 1.8 + 32;
@@ -31,12 +31,13 @@ ValueConverters.fahrenheit = {
 }
 
 // ValueValidators
-ValueValidators.water_temp = {
+var ValueValidators = ValueValidators || {};
+ValueValidators.waterTemp = {
   isValid: function(v) {
     if (v <= 20) {
-      return {result: false, message:"two low"};
+      return {result: false, message:"too low"};
     } else if (v >= 60) {
-      return {result: false, message:"two high"};
+      return {result: false, message:"too high"};
     } else {
       return {result: true, message:"normal"};
     }

@@ -21,12 +21,12 @@
 
 #include "awtk.h"
 #include "mvvm/mvvm.h"
-#include "temperature.h"
+#include "../common/calculator.h"
 
 ret_t application_init() {
-  view_model_factory_register("temperature", temperature_create);
+  view_model_factory_register("calculator", calculator_view_model_create);
 
-  return navigator_to("temperature7");
+  return navigator_to("calculator");
 }
 
 #include "../awtk_main.c"

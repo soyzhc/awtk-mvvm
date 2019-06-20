@@ -1,13 +1,13 @@
 function Temperature () {
-  this.temp = 0;
+  this.value = 0;
   console.log('Temperature');
 }
 
 Temperature.prototype.onTimer = function() {
-  this.temp++;
+  this.value++;
   this.notifyPropsChanged();
 
-  return this.temp < 10 ? RET_REPEAT : RET_REMOVE;
+  return this.value < 10 ? RET_REPEAT : RET_REMOVE;
 }
 
 Temperature.prototype.onWillMount = function(req) {
@@ -25,10 +25,6 @@ Temperature.prototype.onWillUnmount = function() {
 
 Temperature.prototype.onUnmount = function() {
   console.log('onUnmount');
-}
-
-Temperature.prototype.quit = function() {
-  exit();
 }
 
 function createTemperatureTimer(req) {

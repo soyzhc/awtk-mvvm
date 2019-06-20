@@ -19,6 +19,7 @@
  *
  */
 
+#include "awtk.h"
 #include "mvvm/mvvm.h"
 extern ret_t assets_init(void);
 extern ret_t application_init(void);
@@ -52,6 +53,16 @@ int main(void) {
     tk_set_lcd_orientation(LCD_ORIENTATION_90);
   }
 #endif /*WITH_LCD_PORTRAIT*/
+
+#if defined(WIN32)
+#if !defined(NDEBUG)
+  {
+    AllocConsole();
+    FILE* fp = NULL;
+    freopen_s(&fp, "CONOUT$", "w+t", stdout);
+  }
+#endif /*NDEBUG*/
+#endif /*WIN32*/
 
   tk_ext_widgets_init();
 

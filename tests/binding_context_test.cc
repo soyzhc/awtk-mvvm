@@ -11,7 +11,7 @@
 #include "ext_widgets/scroll_view/list_item.h"
 #include "base/idle.h"
 #include "gtest/gtest.h"
-#include "test_obj.inc"
+#include "test_obj.h"
 
 static view_model_t* s_temp_view_model;
 static view_model_t* s_humidity_view_model;
@@ -64,10 +64,10 @@ static view_model_t* persons_create_view_model(void) {
 }
 
 static void test_view_model_init(void) {
-  s_temp_view_model = test_obj_create_view_model();
+  s_temp_view_model = test_obj_view_model_create(NULL);
   view_model_factory_register(STR_V_MODEL_TEMP, test_temp_view_model_get);
 
-  s_humidity_view_model = test_obj_create_view_model();
+  s_humidity_view_model = test_obj_view_model_create(NULL);
   view_model_factory_register(STR_V_MODEL_HUMIDITY, test_humidity_view_model_get);
 
   s_persons_view_model = persons_create_view_model();
@@ -89,6 +89,7 @@ static ret_t test_view_model_deinit(void) {
 
   object_unref(OBJECT(s_persons_view_model));
   s_persons_view_model = NULL;
+  idle_manager_remove_all(idle_manager());
 
   return RET_OK;
 }
@@ -308,7 +309,7 @@ TEST(BindingContextAwtk, command_update_to_view_model) {
   ASSERT_EQ(value_int(&v), 99);
 
   ASSERT_EQ(object_get_prop(OBJECT(s_temp_view_model), "save_count", &v), RET_OK);
-  ASSERT_EQ(value_int(&v), 2);
+  ASSERT_EQ(value_int(&v), 1);
 
   widget_destroy(win);
   test_view_model_deinit();

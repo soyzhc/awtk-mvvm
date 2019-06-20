@@ -56,10 +56,17 @@ static ret_t command_binding_set_prop(object_t* obj, const char* name, const val
     rule->args = tk_str_copy(rule->args, value);
   } else if (equal(COMMAND_BINDING_EVENT, name)) {
     rule->event = tk_str_copy(rule->event, value);
-  } else if (equal(COMMAND_BINDING_EVENT_ARGS, name)) {
-    rule->event_args = tk_str_copy(rule->event_args, value);
+  } else if (equal(COMMAND_BINDING_KEY_FILTER, name)) {
+    rule->key_filter = tk_str_copy(rule->key_filter, value);
+    if (value != NULL) {
+      shortcut_init_with_str(&(rule->filter), value);
+    }
   } else if (equal(COMMAND_BINDING_CLOSE_WINDOW, name)) {
     rule->close_window = value != NULL ? tk_atob(value) : TRUE;
+  } else if (equal(COMMAND_BINDING_AUTO_DISABLE, name)) {
+    rule->auto_disable = value != NULL ? tk_atob(value) : TRUE;
+  } else if (equal(COMMAND_BINDING_QUIT_APP, name)) {
+    rule->quit_app = value != NULL ? tk_atob(value) : TRUE;
   } else if (equal(COMMAND_BINDING_UPDATE_VIEW_MODEL, name)) {
     rule->update_model = value != NULL ? tk_atob(value) : TRUE;
   } else {
@@ -85,6 +92,8 @@ static ret_t command_binding_get_prop(object_t* obj, const char* name, value_t* 
     value_set_str(v, rule->event);
   } else if (equal(COMMAND_BINDING_CLOSE_WINDOW, name)) {
     value_set_bool(v, rule->close_window);
+  } else if (equal(COMMAND_BINDING_QUIT_APP, name)) {
+    value_set_bool(v, rule->quit_app);
   } else if (equal(COMMAND_BINDING_UPDATE_VIEW_MODEL, name)) {
     value_set_bool(v, rule->update_model);
   } else {
@@ -110,13 +119,18 @@ static command_binding_t* command_binding_cast(void* rule) {
 }
 
 command_binding_t* command_binding_create(void) {
-  return (command_binding_t*)object_create(&s_command_binding_vtable);
+  command_binding_t* rule = (command_binding_t*)object_create(&s_command_binding_vtable);
+  return_value_if_fail(rule != NULL, NULL);
+
+  rule->auto_disable = TRUE;
+
+  return rule;
 }
 
 bool_t command_binding_can_exec(command_binding_t* rule) {
   view_model_t* view_model = NULL;
   return_value_if_fail(rule != NULL, FALSE);
-  view_model = BINDING_RULE(rule)->view_model;
+  view_model = BINDING_RULE_VIEW_MODEL(rule);
   return_value_if_fail(view_model != NULL, FALSE);
 
   if (tk_str_ieq(rule->command, COMMAND_BINDING_CMD_NOTHING) ||
@@ -135,7 +149,7 @@ bool_t command_binding_can_exec(command_binding_t* rule) {
 ret_t command_binding_exec(command_binding_t* rule) {
   view_model_t* view_model = NULL;
   return_value_if_fail(rule != NULL, FALSE);
-  view_model = BINDING_RULE(rule)->view_model;
+  view_model = BINDING_RULE_VIEW_MODEL(rule);
   return_value_if_fail(view_model != NULL, FALSE);
 
   if (tk_str_ieq(rule->command, COMMAND_BINDING_CMD_NOTHING)) {

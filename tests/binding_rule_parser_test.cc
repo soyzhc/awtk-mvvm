@@ -11,8 +11,50 @@ TEST(CommandBindingParser, close_window) {
   command_binding_t* cmd = (command_binding_t*)rule;
 
   ASSERT_EQ(cmd->close_window, TRUE);
+  ASSERT_EQ(cmd->auto_disable, TRUE);
   ASSERT_EQ(string(cmd->command), string("Save"));
   ASSERT_EQ(string(cmd->event), string("click"));
+
+  object_unref(OBJECT(rule));
+}
+
+TEST(CommandBindingParser, auto_disable) {
+  binding_rule_t* rule = binding_rule_parse("v-on:click", "{Save, AutoDisable=false}", TRUE);
+  command_binding_t* cmd = (command_binding_t*)rule;
+
+  ASSERT_EQ(cmd->auto_disable, FALSE);
+  ASSERT_EQ(string(cmd->command), string("Save"));
+  ASSERT_EQ(string(cmd->event), string("click"));
+
+  object_unref(OBJECT(rule));
+}
+
+TEST(CommandBindingParser, args) {
+  binding_rule_t* rule = binding_rule_parse("v-on:click", "{add_char, args=1}", TRUE);
+  command_binding_t* cmd = (command_binding_t*)rule;
+
+  ASSERT_EQ(string(cmd->command), string("add_char"));
+  ASSERT_EQ(string(cmd->args), string("1"));
+
+  object_unref(OBJECT(rule));
+}
+
+TEST(CommandBindingParser, args1) {
+  binding_rule_t* rule = binding_rule_parse("v-on:click", "{add_char, args==}", TRUE);
+  command_binding_t* cmd = (command_binding_t*)rule;
+
+  ASSERT_EQ(string(cmd->command), string("add_char"));
+  ASSERT_EQ(string(cmd->args), string("="));
+
+  object_unref(OBJECT(rule));
+}
+
+TEST(CommandBindingParser, args3) {
+  binding_rule_t* rule = binding_rule_parse("v-on:click", "{add_char, args==+-*/==}", TRUE);
+  command_binding_t* cmd = (command_binding_t*)rule;
+
+  ASSERT_EQ(string(cmd->command), string("add_char"));
+  ASSERT_EQ(string(cmd->args), string("=+-*/=="));
 
   object_unref(OBJECT(rule));
 }
@@ -67,26 +109,26 @@ TEST(CommandBindingParser, update_model_false) {
   object_unref(OBJECT(rule));
 }
 
-TEST(CommandBindingParser, event_args) {
+TEST(CommandBindingParser, key_filter) {
   binding_rule_t* rule =
       binding_rule_parse("v-on:keydown:ctrl_a", "{Save, UpdateModel=False}", TRUE);
   command_binding_t* cmd = (command_binding_t*)rule;
 
   ASSERT_EQ(cmd->update_model, FALSE);
   ASSERT_EQ(string(cmd->event), string("keydown"));
-  ASSERT_EQ(string(cmd->event_args), string("ctrl_a"));
+  ASSERT_EQ(string(cmd->key_filter), string("ctrl_a"));
 
   object_unref(OBJECT(rule));
 }
 
-TEST(CommandBindingParser, ievent_args) {
+TEST(CommandBindingParser, ikey_filter) {
   binding_rule_t* rule =
       binding_rule_parse("v-on:keydown:ctrl_a", "{Save, updateModel=false}", TRUE);
   command_binding_t* cmd = (command_binding_t*)rule;
 
   ASSERT_EQ(cmd->update_model, FALSE);
   ASSERT_EQ(string(cmd->event), string("keydown"));
-  ASSERT_EQ(string(cmd->event_args), string("ctrl_a"));
+  ASSERT_EQ(string(cmd->key_filter), string("ctrl_a"));
 
   object_unref(OBJECT(rule));
 }
