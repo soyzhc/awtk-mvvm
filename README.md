@@ -50,6 +50,16 @@ git clone https://github.com/jerryscript-project/jerryscript.git 3rd/jerryscript
 scons
 ```
 
+> 编译linux-fb版本，请修改SConstruct
+
+```
+#for pc
+#sys.path.insert(0, '../awtk/')
+
+#for linux-fb
+sys.path.insert(0, '../awtk-linux-fb/')
+```
+
 * 运行demos
 
 ```
@@ -60,28 +70,33 @@ scons
 
 ## 四、文档
 * [介绍](docs/8.intro.md)
-* [ViewModel实现方法](9.view_model.md)
+* [ViewModel实现方法](docs/9.view_model.md)
 * [数据绑定](docs/10.data_binding.md)
 * [命令绑定](docs/11.command_binding.md)
 * [窗口导航器](docs/12.navigate.md)
+* [JS实现ViewModel](docs/13.js_view_model.md)
+* [高级用法](docs/14.advance_usages.md)
 
 ## 五、示例
 
 |  C DEMO  | JS DEMO  | 说明 |
 | -------- | -------  | --------------------------------- |
-| demo1    | jsdemo1  | 数据绑定基本用法                     |
-| demo2    | jsdemo2  | trigger参数的用法                   |
-| demo3    | jsdemo3  | converter参数的用法                 |
-| demo4    | jsdemo4  | 显式更新(Trigger=Explicit)的用法     |
-| demo5    | jsdemo5  | validator参数的用法                 |
-| demo6    | jsdemo6  | 命令绑定的基本用法                    |
-| demo7    | jsdemo7  | 以计算器为例的综合用法                |
-| demo8    | jsdemo8  | 以shape编辑为例的综合用法             |
+| demo1    | jsdemo1  | 数据绑定基本用法                  |
+| demo2    | jsdemo2  | trigger参数的用法                 |
+| demo3    | jsdemo3  | converter参数的用法               |
+| demo4    | jsdemo4  | 显式更新(Trigger=Explicit)的用法  |
+| demo5    | jsdemo5  | validator参数的用法               |
+| demo6    | jsdemo6  | 命令绑定的基本用法                |
+| demo7    | jsdemo7  | 以计算器为例的综合用法            |
+| demo8    | jsdemo8  | 以shape编辑为例的综合用法         |
 | demo9    | jsdemo9  | 多窗口的基本用法                     |
 | demo10   | jsdemo10 | 定时器的基本用法                     |
 | demo11   | jsdemo11 | 一个视图多个ViewModel的用法          |
 | demo12   | jsdemo12 | 多窗口之间参数传递                   |
 | demo13   | jsdemo13 | 列表视图的基本用法                   |
 | demo14   | jsdemo14 | 快捷键的基本用法                     |
-| demo15   | （no）    | 自定义导航器处理插件，以及MVVM窗口和非MVVM窗口的交互 |
-
+| demo15   | （no）   | 自定义导航器处理插件，以及MVVM窗口和非MVVM窗口的交互 |
+| (no)     | jsdemo15 | combox 数据联动                     |
+| (no)     | jsdemo16 | 动态界面                            |
+| demo16   | (no)     | 集成硬件外设                        |
+| demo17   | (no)     | 无GUI情况集成硬件外设               |

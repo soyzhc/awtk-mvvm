@@ -43,7 +43,13 @@ ret_t str_random(str_t* str, const char* format, uint32_t max) {
   char buff[256];
   return_value_if_fail(str != NULL && format != NULL && max > 0, RET_BAD_PARAMS);
 
-  tk_snprintf(buff, sizeof(buff) - 1, format, random() / max);
+  tk_snprintf(buff, sizeof(buff) - 1, format, random() % max);
 
   return str_set(str, buff);
+}
+
+bool_t tk_is_valid_prop_name(const char* name) {
+  return_value_if_fail(name != NULL, FALSE);
+
+  return tk_is_valid_name(name) || tk_str_start_with(name, "item.");
 }
